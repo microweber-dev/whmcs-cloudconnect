@@ -1,1 +1,1 @@
-# whmcs-cloudconnect
+# WHMCS Cloud Connect

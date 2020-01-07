@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Microweber Cloud Connect Module v0.0.1
  * Developed by Bozhidar Slaveykov - bobi@microweber.com
