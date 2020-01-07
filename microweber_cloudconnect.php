@@ -51,120 +51,6 @@ function microweber_cloudconnect_ConfigOptions()
 }
 
 /**
- * Get or create the custom microweber_id.
- *
- * @param array $params
- *
- * @return string
- */
-function microweber_id(array $params)
-{
-
-    /**
-     * Attempt to find the custom client field
-     */
-    $microweber_field = Capsule::table('tblcustomfields')
-        ->where('fieldname', 'microweber_id')
-        ->first();
-
-    /**
-     * If it cannot be found, return friendly error
-     */
-    if (!$microweber_field->id) {
-
-        return 'Failed to create microweber_id, have you added your custom client field?';
-
-    }
-
-    /**
-     * If found, check if it has a value set for this Customer
-     */
-    $microweber_id = Capsule::table('tblcustomfieldsvalues')
-        ->where('fieldid', $microweber_field->id)
-        ->where('relid', $params['clientsdetails']['userid'])
-        ->first()->value;
-
-    /**
-     * If its got a value, return it
-     */
-    if (!empty($microweber_id)) {
-
-        return $microweber_id;
-
-        /**
-         * If not set try and populate the value
-         */
-    } else {
-
-        try {
-
-            $payload = [
-                'name' => $params['clientsdetails']['firstname'] . ' ' . $params['clientsdetails']['lastname'],
-                'email' => $params['clientsdetails']['email'],
-                'plan_unique_id' => 'whmcs', // Your WHMCS plan defined at Hyper Host, needs to be named whmcs
-                'status' => 'active', // Activate this user
-            ];
-
-            $curl = curl_init();
-
-            curl_setopt_array($curl, array(
-                CURLOPT_URL => "https://microweber.com/api/v1/sub_users",
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_ENCODING => "",
-                CURLOPT_MAXREDIRS => 10,
-                CURLOPT_TIMEOUT => 0,
-                CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                CURLOPT_CUSTOMREQUEST => "POST",
-                CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_HTTPHEADER => array(
-                    "Content-Type: application/json",
-                    "Accept: application/json",
-                    "Authorization: Bearer " . $params['serverpassword']
-                ),
-            ));
-
-            $response = curl_exec($curl);
-            $err      = curl_error($curl);
-
-            curl_close($curl);
-
-            if ($err) {
-
-                return $err;
-
-            } else {
-
-                Capsule::table('tblcustomfieldsvalues')
-                    ->where('fieldid', $microweber_field->id)
-                    ->where('relid', $params['clientsdetails']['userid'])
-                    ->update([
-                        'value' => $response->microweber_id,
-                    ]);
-
-                return $response;
-
-            }
-
-        } catch (Throwable $e) {
-
-            logModuleCall(
-                'provisioningmodule',
-                __FUNCTION__,
-                $params,
-                $e->getMessage(),
-                $e->getTraceAsString()
-            );
-
-            return $e->getMessage();
-
-        }
-
-    }
-
-}
-
-/**
  * Provision a new instance of a product/service.
  *
  * @param array $params
@@ -173,49 +59,47 @@ function microweber_id(array $params)
  */
 function microweber_cloudconnect_CreateAccount(array $params)
 {
-
     try {
+        $get_server = Capsule::table('tblservers')
+            ->where('id', $params['serverid'])->first();
 
-        $microweberId = microweber_id($params);
+        if ($get_server) {
 
-        $payload = [
-            'platform' => $params['configoption1'],
-            'domain' => $params['domain'],
-            'microweber_id' => $microweberId,
-        ];
+            $payload = array(
+                'm' => 'microweber_server',
+                'function' => 'create_account',
+                'platform' => $params['configoption1'],
+                'domain' => $params['domain'],
+                'username'=> $params['username'],
+                'password'=> $params['domain'],
+                'api_key'=> $get_server->accesshash
+            );
 
-        $curl = curl_init();
+            $curl = curl_init();
 
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => "https://microweber.com/api/v1/packages",
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => array(
-                "Content-Type: application/json",
-                "Accept: application/json",
-                "Authorization: Bearer " . $params['serverpassword']
-            ),
-        ));
+            curl_setopt_array($curl, array(
+                CURLOPT_URL => $get_server->hostname . '/index.php?' . http_build_query($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_ENCODING => "",
+                CURLOPT_MAXREDIRS => 10,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_FOLLOWLOCATION => 1
+            ));
 
-        $response = curl_exec($curl);
-        $err      = curl_error($curl);
+            $response = curl_exec($curl);
+            $err = curl_error($curl);
 
-        curl_close($curl);
+            curl_close($curl);
 
-        if ($err) {
 
-            return $err;
 
-        } else {
-
-            return 'success';
-
+            var_dump($response);
+            die();
+            if ($err) {
+                return $err;
+            } else {
+                return 'success';
+            }
         }
 
     } catch (Throwable $e) {
