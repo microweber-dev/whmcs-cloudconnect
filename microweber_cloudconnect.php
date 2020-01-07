@@ -90,15 +90,14 @@ function microweber_cloudconnect_CreateAccount(array $params)
             $err = curl_error($curl);
 
             curl_close($curl);
+            
+            $json = json_decode($response, TRUE);
+            if (isset($json['success']) && $json['success']) {
+                return 'success';
+            }
 
-
-
-            var_dump($response);
-            die();
             if ($err) {
                 return $err;
-            } else {
-                return 'success';
             }
         }
 
