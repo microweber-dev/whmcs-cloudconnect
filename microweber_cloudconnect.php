@@ -244,24 +244,17 @@ function microweber_cloudconnect_CreateAccount(array $params)
  */
 function microweber_cloudconnect_TestConnection(array $params)
 {
-
+    $success = false;
     try {
-
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
-            CURLOPT_URL => "https://microweber.com/api/v1/packages",
+            CURLOPT_URL => $params['serverhostname'] . '/index.php?m=microweber_server&function=validate_api_key&api_key=' . $params['serveraccesshash'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "GET",
-            CURLOPT_HTTPHEADER => array(
-                "Content-Type: application/json",
-                "Authorization: Bearer " . $params['serverpassword']
-            ),
         ));
 
         $response = curl_exec($curl);
@@ -271,12 +264,8 @@ function microweber_cloudconnect_TestConnection(array $params)
 
         if ($err) {
             $errorMsg = $err;
-        } else {
-            $success = true;
         }
-
     } catch (Throwable $e) {
-
         logModuleCall(
             'provisioningmodule',
             __FUNCTION__,
@@ -284,10 +273,17 @@ function microweber_cloudconnect_TestConnection(array $params)
             $e->getMessage(),
             $e->getTraceAsString()
         );
-
         $success  = false;
         $errorMsg = $e->getMessage();
+    }
 
+    $json = json_decode($response, true);
+
+    if(isset($json['is_correct']) && $json['is_correct']) {
+        $success = true;
+    } else {
+        $errorMsg = 'Invalid api key.';
+        $success = false;
     }
 
     return array(
