@@ -90,7 +90,7 @@ function microweber_cloudconnect_CreateAccount(array $params)
             $err = curl_error($curl);
 
             curl_close($curl);
-            
+
             $json = json_decode($response, TRUE);
             if (isset($json['success']) && $json['success']) {
                 return 'success';
@@ -271,19 +271,47 @@ function microweber_cloudconnect_ServiceSingleSignOn(array $params)
  */
 function microweber_cloudconnect_SuspendAccount(array $params)
 {
-
     try {
+        $get_server = Capsule::table('tblservers')
+            ->where('id', $params['serverid'])->first();
 
-        $microweberId = microweber_id($params);
+        if ($get_server) {
 
-        $payload = [
-            'status' => 'disabled',
-        ];
+            $payload = array(
+                'm' => 'microweber_server',
+                'function' => 'suspend_account',
+                'platform' => $params['configoption1'],
+                'domain' => $params['domain'],
+                'username'=> $params['username'],
+                'password'=> $params['password'],
+                'api_key'=> $get_server->accesshash
+            );
 
-        $microweberClient = microweber_cloudconnect_Client($params['serverpassword']);
-        $microweberClient->put('sub_users/' . $microweberId, ['json' => $payload])->getBody()->getContents();
+            $curl = curl_init();
 
-        return 'success';
+            curl_setopt_array($curl, array(
+                CURLOPT_URL => $get_server->hostname . '/index.php?' . http_build_query($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_ENCODING => "",
+                CURLOPT_MAXREDIRS => 10,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_FOLLOWLOCATION => 1
+            ));
+
+            $response = curl_exec($curl);
+            $err = curl_error($curl);
+
+            curl_close($curl);
+            
+            $json = json_decode($response, TRUE);
+            if (isset($json['success']) && $json['success']) {
+                return 'success';
+            }
+
+            if ($err) {
+                return $err;
+            }
+        }
 
     } catch (Throwable $e) {
 
@@ -296,6 +324,7 @@ function microweber_cloudconnect_SuspendAccount(array $params)
         );
 
         return $e->getMessage();
+
     }
 
 }
