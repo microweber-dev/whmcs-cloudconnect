@@ -71,7 +71,7 @@ function microweber_cloudconnect_CreateAccount(array $params)
                 'platform' => $params['configoption1'],
                 'domain' => $params['domain'],
                 'username'=> $params['username'],
-                'password'=> $params['domain'],
+                'password'=> $params['password'],
                 'api_key'=> $get_server->accesshash
             );
 
