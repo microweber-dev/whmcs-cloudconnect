@@ -188,59 +188,47 @@ function microweber_cloudconnect_TestConnection(array $params)
  */
 function microweber_cloudconnect_ServiceSingleSignOn(array $params)
 {
-
     try {
+        $get_server = Capsule::table('tblservers')
+            ->where('id', $params['serverid'])->first();
 
-        $microweberId = microweber_id($params);
+        if ($get_server) {
 
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => "https://microweber.com/api/v1/whmcs/sso",
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => "",
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => json_encode(['identifier' => $params['domain']]),
-            CURLOPT_HTTPHEADER => array(
-                "Content-Type: application/json",
-                "Authorization: Bearer " . $params['serverpassword']
-            ),
-        ));
-
-        $response = curl_exec($curl);
-
-        $err  = curl_error($curl);
-        $info = curl_getinfo($curl);
-
-        curl_close($curl);
-
-        if ($err) {
-
-            return array(
-                'success' => false,
-                'errorMsg' => $err,
+            $payload = array(
+                'm' => 'microweber_server',
+                'function' => 'single_signon',
+                'platform' => $params['configoption1'],
+                'domain' => $params['domain'],
+                'api_key'=> $get_server->accesshash
             );
 
-        } else {
+            $curl = curl_init();
 
-            if ($info['http_code'] !== 200) {
+            curl_setopt_array($curl, array(
+                CURLOPT_URL => $get_server->hostname . '/index.php?' . http_build_query($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_ENCODING => "",
+                CURLOPT_MAXREDIRS => 10,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_FOLLOWLOCATION => 1
+            ));
 
+            $response = curl_exec($curl);
+            $err = curl_error($curl);
+
+            curl_close($curl);
+
+            $json = json_decode($response, TRUE);
+            if (isset($json['success']) && $json['success'] && isset($json['redirect_url'])) {
                 return array(
-                    'success' => false,
-                    'errorMsg' => $response,
+                    'success' => true,
+                    'redirectTo' => $json['redirect_url'],
                 );
-
             }
 
-            return array(
-                'success' => true,
-                'redirectTo' => $response,
-            );
-
+            if ($err) {
+                return $err;
+            }
         }
 
     } catch (Throwable $e) {
@@ -253,10 +241,7 @@ function microweber_cloudconnect_ServiceSingleSignOn(array $params)
             $e->getTraceAsString()
         );
 
-        return array(
-            'success' => false,
-            'errorMsg' => $e->getMessage(),
-        );
+        return $e->getMessage();
 
     }
 
@@ -339,51 +324,6 @@ function microweber_cloudconnect_SuspendAccount(array $params)
 function microweber_cloudconnect_UnsuspendAccount(array $params)
 {
 
-    try {
 
-        $microweberId = microweber_id($params);
-
-        $payload = [
-            'status' => 'active',
-        ];
-
-        $microweberClient = microweber_cloudconnect_Client($params['serverpassword']);
-        $microweberClient->put('sub_users/' . $microweberId, ['json' => $payload])->getBody()->getContents();
-
-        return 'success';
-
-    } catch (Throwable $e) {
-
-        logModuleCall(
-            'provisioningmodule',
-            __FUNCTION__,
-            $params,
-            $e->getMessage(),
-            $e->getTraceAsString()
-        );
-
-        return $e->getMessage();
-    }
-
-}
-
-/**
- * @param $apiToken
- *
- * @return Client
- */
-function microweber_cloudconnect_Client($apiToken)
-{
-
-    /**
-     * Setup a Guzzle Client just for this Auth request
-     */
-    return new Client([
-        'base_url' => ['https://microweber.com/api/v1/', ['version' => 'v1']],
-        'headers' => [
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $apiToken
-        ]
-    ]);
 
 }
